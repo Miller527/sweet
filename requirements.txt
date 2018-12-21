@@ -1,0 +1,15 @@
+sanic
+
+sanic_session
+
+jinja2
+
+aiomysql
+
+aioredis
+
+Elasticsearch
+
+Pillow
+
+ujson
