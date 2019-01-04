@@ -67,38 +67,41 @@ async def get_menu_permission(menu):
 
 async def verify_login(request):
     """基于RBAC内置验证登录"""
-    # 写session, 菜单列表写入session
     username = request.form.get("username", "")
     password = request.form.get("password", "")
-    coord = int(request.form.get("coord", 0))
-    deviation = request["session"].get("coords",[])
-    print(coord, deviation)
-    print(md5_check("password1",leftsalt="curd",rightsalt="rbac"))
-    print(password)
+    coordX = int(request.form.get("coordX", 0))
+    coordY = int(request.form.get("coordY", 0))
+    deviation = request["session"].get("coords", [])
+    tmp_coordY = request["session"].get("coordY", -1)
+
     if not username or not password:
         return JsonResponse({"status": 403, "msg": "请输入正确的用户和密码."})
-    if not coord or len(deviation) != 2 or not (deviation[0] < coord < deviation[1]):
+    if not coordX or len(deviation) != 2 \
+            or not (deviation[0] < coordX < deviation[1]) \
+            or coordY != tmp_coordY:
         return JsonResponse({"status": 403, "msg": "验证码错误"})
 
     sql = f'SELECT id,user_name FROM account WHERE user_name="{username}" and passwd="{password}"'
+
     user_result = await AdminConfig.Query.select(sql, fetchone=True)
     if not user_result or not isinstance(user_result, dict):
         return JsonResponse({"status": 403, "msg": "用户名或密码错误, 请重新输入."})
+
     user_id = user_result.get("id")
     user_name = user_result.get("user_name")
     if not user_id:
         return JsonResponse({"status": 403, "msg": "用户查询失败."})
+
     sql = f'SELECT * FROM menu WHERE id in (SELECT menu_id FROM role_menu WHERE role_id' \
         f' in (SELECT role_id FROM role_account WHERE aid="{user_id}")) and status=1'
+
     result = await AdminConfig.Query.select(sql)
     menu_list, permission = await get_menu_permission(result)
-    # sessionid = md5_check(username, leftsalt=AdminConfig.SessionLeftSalt, rightsalt=AdminConfig.SessionRightSalt)
     request["session"]["permission"] = permission
     request["session"]["menu"] = menu_list
     request["session"]["account_id"] = user_id
     request["session"]["account_name"] = user_name
     resp = JsonResponse({"status": 200, "msg": "SUCCESS"})
-    # resp.cookies["sessionid"] = sessionid
     return resp
 
 

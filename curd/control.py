@@ -2,21 +2,17 @@
 # -*- coding: utf-8 -*-
 # __author__ = "Miller"
 # Date: 2018/12/12
-
+import asyncio
 import os
 import warnings
-from .table import TableConfig
+
+import aiomysql
+from aiomysql import DictCursor
+
+from curd.db import MySQLDB
 from .utils.string import camel_string
 
 _path = os.path.dirname(__file__)
-
-
-class TableExistedWarning(Warning):
-    def __init__(self, msg: str):
-        self.message = msg
-
-    def __str__(self):
-        return f"TableConfig '{self.message}' already exist."
 
 
 class ElementExistedWarning(Warning):
@@ -38,6 +34,7 @@ class TemplateTypeError(Exception):
 
     def __str__(self):
         return f"TemplateTypeError: '{self.message}' type is not supported."
+
 
 class ParamTypeError(Exception):
     def __init__(self, msg: str):
@@ -101,30 +98,52 @@ class _AdminConfig(object):
         self._db_conn_params = {}
         self._verify_login_func = None
         self._behavior_log_type = "mysql"
-        self.Registry = {}
         self._app_middle = {
             "request": _CustomSet(),
             "response": _CustomSet(),
         }
+        self.Registry = {}
 
         self.Query = None
         self.BehaviorLog = None
-        self. _session_left_salt= "curd"
+        self._session_left_salt = "curd"
         self._session_right_salt = "rbac"
         self._session_expire = 600
+        self._tables = _CustomSet()
+        self._sorted_tables = []
         # self._buttons = _CustomSet()
         # self._global_middlewares = _CustomSet()
         # self._group_middlewares = _CustomSet()
 
-    @property
-    def SessionLeftSalt(self):
-        return self._session_left_salt
+    def registry_sorted(self):
+        line = []
 
-    @SessionLeftSalt.setter
-    def SessionLeftSalt(self, val: str):
-        if not isinstance(val, str):
-            raise ParamTypeError("SessionLeftSalt")
-        self._session_left_salt = val
+        for k, v in self.Registry.items():
+            if len(v["conf"].field) >= 5:
+                self._sorted_tables.append([k])
+            else:
+                line.append(k)
+                if len(line) == 2:
+                    self._sorted_tables.append(line)
+                    line = []
+                    continue
+        else:
+            if line:
+                self._sorted_tables.append(line)
+
+    @property
+    def RegistrySorted(self):
+        return self._sorted_tables
+
+    @property
+    def tables(self):
+        return self._tables.value
+
+    def add_table(self, *names: str):
+        self._tables.add(*names)
+
+    def delete_table(self, name: str):
+        self._tables.delete(name)
 
     @property
     def SessionRightSalt(self):
@@ -146,7 +165,6 @@ class _AdminConfig(object):
             raise ParamTypeError("SessionExpire")
         self._session_right_salt = val
 
-
     @property
     def request_middleware(self):
         return self._app_middle.get("request").value
@@ -167,7 +185,6 @@ class _AdminConfig(object):
     def delete_response_middleware(self, *func):
         self._app_middle.get("response").delete(*func)
 
-
     @property
     def BehaviorLogType(self):
         return self._behavior_log_type
@@ -178,6 +195,7 @@ class _AdminConfig(object):
             raise BehaviorLogTypeError(val)
         self._behavior_log_type = val
         self._db_conn_params = {}
+
     @property
     def Listener(self):
         return self._listener
@@ -321,19 +339,6 @@ class _AdminConfig(object):
         if self.AccessControl not in ["rbac", "static"]:
             raise AccessControlError()
 
-    def register(self, desc, conf: TableConfig):
-        """
-        注册数据表
-        :param desc: 表结构
-        :param conf: 表配置
-        :return:
-        """
-
-        if desc not in self.Registry:
-            self.Registry[camel_string(desc.__name__)] = {"desc": desc, "conf": conf}
-        else:
-            warnings.warn(TableExistedWarning(desc))
-
     def _verify_name(self, desc):
         """校验数据库表明"""
         name = camel_string(desc.__name__)
@@ -352,3 +357,20 @@ AdminConfig = _AdminConfig()
 
 def new_admin_config():
     return _AdminConfig()
+
+
+_loop = None
+_pool = None
+
+
+def new_db():
+    print(AdminConfig.MySQLDBConnParams)
+    global _loop
+    global _pool
+    if not _loop:
+        _loop = asyncio.get_event_loop()
+        asyncio.set_event_loop(_loop)
+        _pool = _loop.run_until_complete(aiomysql.create_pool(loop=_loop, maxsize=10, minsize=3, pool_recycle=3,
+                                                              cursorclass=DictCursor, **AdminConfig.MySQLDBConnParams))
+
+    return _loop, MySQLDB(pool=_pool)

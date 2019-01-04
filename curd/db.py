@@ -3,9 +3,6 @@
 # __author__ = "Miller"
 # Date: 2018/12/12
 
-import asyncio
-import aiomysql
-
 from curd.interface import IBehaviorLog
 
 
@@ -49,6 +46,7 @@ class MySQLDB(IBehaviorLog):
                 await conn.commit()
         return res
 
+
     def select(self, sql, *args,**kwargs):
 
         sql = sql % tuple(args) if args else sql
@@ -59,13 +57,18 @@ class MySQLDB(IBehaviorLog):
         res = self._insert(sql)
         return res
 
+    def delete(self, sql, *args):
+        sql = self.join_sql(sql, *args)
+        res = self._insert(sql)
+        return res
+
+
     @staticmethod
     def join_sql(sql, *args):
         return sql % tuple(args) if args else sql
 
     def close(self):
-        self.loop.close()
-        del self.loop
+        pass
 
     def write(self, data: dict):
         pass

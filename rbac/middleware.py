@@ -21,8 +21,9 @@ async def login_middle(request):
         url_path = request.path[:-1]
     else:
         url_path = request.path
-    print("middler======",  request["session"])
     permission = request["session"].get("permission", {})
+    # todo, 打印 session 内容，有访问权限的url
+    # print("permission---------------->", permission)
     if url_path not in AdminConfig.white_urls and "static" not in url_path:
         if not permission:
             return RedirectResponse("/manager/login")

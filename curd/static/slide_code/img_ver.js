@@ -206,7 +206,7 @@ function imgVer(Config) {
                     $(".ver-tips").removeClass("slider-tips");
                     imgVer(Config);
                 }, 2000);
-                Config.success(moveEnd_X);
+                Config.success(moveEnd_X, Y);
 
             } else {//失败执行
                 $(".ver-tips").html('<i style="background-position:-4px -1229px;"></i><span style="color:red;">验证失败:</span><span style="margin-left:4px;">拖动滑块将悬浮图像正确拼合</span>');

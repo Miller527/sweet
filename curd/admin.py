@@ -3,14 +3,35 @@
 # __author__ = "Miller"
 # Date: 2018/12/10
 import os
+import warnings
 
 from sanic import Sanic, Blueprint
 
+from curd.db import MySQLDB
 from curd.handler.listener import add_listen
+from curd.table import TableConfig
+from curd.utils.string import camel_string
 from .es import es
-from .control import AdminConfig, _AdminConfig, _path
+from .control import AdminConfig, _AdminConfig,  new_db
 from .views import login, index, logout, verify_login, delete, update, listed, add, detail, table_index, \
     multi_table_index, slide_code
+
+lp, mysql = new_db()
+
+class TableExistedWarning(Warning):
+    def __init__(self, msg: str):
+        self.message = msg
+
+    def __str__(self):
+        return f"TableConfig '{self.message}' already exist."
+
+class TableNotFoundError(Exception):
+    def __init__(self, msg: str):
+        self.message = msg
+
+    def __str__(self):
+        return f"TableNotFoundError: table '{self.message}' not found."
+
 
 
 class SanicAppError(Warning):
@@ -25,8 +46,32 @@ class _AppAdmin(object):
         self.Config.check_params()
         self._init_static_url()
 
+    def get_tables(self):
+        res = lp.run_until_complete(mysql.select("show tables"))
+        for line in res:
+            self.Config.add_table(line["Tables_in_eams"])
+
+        print(self.Config.tables)
     # def _init_behavior_log(self):
     #     self.behavior_log = mysql if self.Config.BehaviorLog == "mysql" else es
+
+    def register(self, desc, conf: TableConfig):
+        """
+        注册数据表
+        :param desc: 表结构
+        :param conf: 表配置
+        :return:
+        """
+        tb_name = camel_string(desc.__name__)
+        if tb_name not in self.Config.tables:
+            raise TableNotFoundError(tb_name)
+        if tb_name not in self.Config.Registry:
+            conf.check()
+            conf.length = len(conf.field)
+
+            self.Config.Registry[tb_name] = {"desc": desc, "conf": conf}
+        else:
+            warnings.warn(TableExistedWarning(desc))
 
     def _init_static_url(self):
         self._static_url = {
@@ -101,7 +146,7 @@ class _AppAdmin(object):
 
 
 AppAdmin = _AppAdmin(AdminConfig)
-
+AppAdmin.get_tables()
 
 def new_app_admin(admin_config: _AdminConfig):
     """返回一个新的admin对象, 可用于构建其他蓝图"""
@@ -118,6 +163,10 @@ def init(app: Sanic, app_admin: _AppAdmin = None):
     app_admin.urls(bp=_bp)
     app_admin.middles(app=app)
     app.blueprint(_bp)
+
+    app_admin.Config.registry_sorted()
+    MySQLDB.clear()
+
     # app.static('/curd_static', 'curd/static', )
     # if app_admin.Config.BehaviorLog =="mysql":
     #     app_admin.Config.Query = mysql

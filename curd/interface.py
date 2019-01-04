@@ -22,7 +22,10 @@ class IBehaviorLog(metaclass=abc.ABCMeta):
         self.args = args
         self.kwargs = kwargs
         self.init()
-
+    @classmethod
+    def clear(cls):
+        cls.__instance = None
+        cls.__init_flag = False
     @abc.abstractmethod
     async def init(self):
         """连接对象、配置对象信息等"""

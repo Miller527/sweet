@@ -5,7 +5,7 @@
 
 from sanic import response
 
-from jinja2 import Environment, select_autoescape, FileSystemLoader
+from jinja2 import Environment, select_autoescape, FileSystemLoader,Markup
 
 from ..control import AdminConfig
 

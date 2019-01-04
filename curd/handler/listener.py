@@ -24,7 +24,8 @@ async def before_server_start(app: Sanic, loop):
     :return:
     """
     if AdminConfig.Listener:
-        pool = await aiomysql.create_pool(loop=loop,maxsize=10, pool_recycle=3, cursorclass=DictCursor, **AdminConfig.MySQLDBConnParams)
+        pool = await aiomysql.create_pool(loop=loop, maxsize=20, pool_recycle=10, cursorclass=DictCursor,
+                                          **AdminConfig.MySQLDBConnParams)
         AdminConfig.Query = MySQLDB(pool=pool)
         if AdminConfig.BehaviorLog == "mysql":
             AdminConfig.BehaviorLog = AdminConfig.Query
